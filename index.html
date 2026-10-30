@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Calcolo rapido</title>
+  <meta name="description" content="Allenamento di calcolo a mente in 120 secondi, con i preset T12, T100 e Default.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Calcolo">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Home -->
+  <main id="home" class="screen" aria-labelledby="home-title">
+    <header class="home-header">
+      <h1 id="home-title">Calcolo rapido</h1>
+      <p class="lead">Due minuti. Rispondi a più domande che puoi: la risposta giusta passa da sola.</p>
+    </header>
+
+    <h2 class="section-title">Allenamenti</h2>
+    <ul class="group" id="preset-list"></ul>
+
+    <h2 class="section-title">Oggi</h2>
+    <div class="group today">
+      <p id="today-summary" class="today-summary">Nessuna partita oggi.</p>
+      <button type="button" class="row-button" id="copy-today">Copia i punteggi di oggi</button>
+      <p class="inline-status" id="copy-today-status" role="status" aria-live="polite"></p>
+    </div>
+
+    <h2 class="section-title">Ultime partite</h2>
+    <ul class="group history" id="history-list"></ul>
+  </main>
+
+  <!-- Game -->
+  <section id="game" class="screen game" hidden aria-label="Partita in corso">
+    <div class="game-top">
+      <button type="button" class="icon-button" id="quit" aria-label="Termina partita senza salvare">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="game-meta">
+        <span class="preset-chip" id="game-preset">T12</span>
+        <span class="timer" id="timer" aria-label="Tempo rimasto">2:00</span>
+      </div>
+      <div class="score-box"><span class="score-label">Punti</span> <span class="score" id="score">0</span></div>
+    </div>
+    <div class="timebar" aria-hidden="true"><div class="timebar-fill" id="timebar"></div></div>
+
+    <div class="stage">
+      <p class="countdown" id="countdown" aria-live="assertive" hidden>3</p>
+      <p class="problem" id="problem" aria-live="polite"></p>
+      <p class="answer" id="answer" aria-label="La tua risposta"><span class="answer-placeholder">?</span></p>
+    </div>
+
+    <div class="keypad" id="keypad" role="group" aria-label="Tastierino numerico">
+      <button type="button" class="key" data-key="1">1</button>
+      <button type="button" class="key" data-key="2">2</button>
+      <button type="button" class="key" data-key="3">3</button>
+      <button type="button" class="key" data-key="4">4</button>
+      <button type="button" class="key" data-key="5">5</button>
+      <button type="button" class="key" data-key="6">6</button>
+      <button type="button" class="key" data-key="7">7</button>
+      <button type="button" class="key" data-key="8">8</button>
+      <button type="button" class="key" data-key="9">9</button>
+      <button type="button" class="key key-fn" data-key="clear" aria-label="Azzera la risposta">C</button>
+      <button type="button" class="key" data-key="0">0</button>
+      <button type="button" class="key key-fn" data-key="back" aria-label="Cancella l'ultima cifra">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6-7z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg>
+      </button>
+    </div>
+
+    <div class="pause" id="pause" hidden>
+      <div class="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <h2 id="pause-title">In pausa</h2>
+        <p id="pause-text">Il tempo è fermo finché non riprendi.</p>
+        <button type="button" class="button primary" id="resume">Riprendi</button>
+        <button type="button" class="button" id="pause-quit">Termina senza salvare</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <main id="results" class="screen" hidden aria-labelledby="results-title">
+    <header class="results-header">
+      <p class="results-preset" id="results-preset">T12</p>
+      <h1 id="results-title" class="results-score"><span id="results-score">0</span> <span class="results-unit">punti</span></h1>
+      <p class="results-rate" id="results-rate"></p>
+      <p class="results-record" id="results-record"></p>
+    </header>
+
+    <h2 class="section-title">Dove hai perso tempo</h2>
+    <ul class="group slow" id="slow-list"></ul>
+
+    <div class="actions">
+      <button type="button" class="button primary" id="again">Rigioca</button>
+      <button type="button" class="button" id="copy-result">Copia per il diario</button>
+      <p class="inline-status" id="copy-result-status" role="status" aria-live="polite"></p>
+      <button type="button" class="button plain" id="to-home">Torna alla home</button>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
