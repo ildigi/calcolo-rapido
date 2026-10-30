@@ -18,8 +18,30 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Login -->
+  <main id="login" class="screen" hidden aria-labelledby="login-title">
+    <header class="home-header">
+      <h1 id="login-title">Calcolo rapido</h1>
+      <p class="lead">Accedi con il tuo account. Le registrazioni sono chiuse: l'app è riservata al suo proprietario.</p>
+    </header>
+    <form id="login-form" class="group form" novalidate>
+      <label class="field">
+        <span>Email</span>
+        <input id="login-email" type="email" name="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+      </label>
+    </form>
+    <p class="form-error" id="login-error" role="alert"></p>
+    <div class="actions">
+      <button type="submit" form="login-form" class="button primary" id="login-submit">Accedi</button>
+    </div>
+  </main>
+
   <!-- Home -->
-  <main id="home" class="screen" aria-labelledby="home-title">
+  <main id="home" class="screen" hidden aria-labelledby="home-title">
     <header class="home-header">
       <h1 id="home-title">Calcolo rapido</h1>
       <p class="lead">Due minuti. Rispondi a più domande che puoi: la risposta giusta passa da sola.</p>
@@ -37,6 +59,14 @@
 
     <h2 class="section-title">Ultime partite</h2>
     <ul class="group history" id="history-list"></ul>
+
+    <h2 class="section-title">Account</h2>
+    <div class="group today">
+      <p class="today-summary" id="account-line"></p>
+      <p class="sync-status" id="sync-status" role="status" aria-live="polite"></p>
+      <button type="button" class="row-button" id="sync-now">Sincronizza ora</button>
+      <button type="button" class="row-button" id="sign-out">Esci</button>
+    </div>
   </main>
 
   <!-- Game -->
@@ -106,6 +136,7 @@
     </div>
   </main>
 
+  <script src="cloud.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

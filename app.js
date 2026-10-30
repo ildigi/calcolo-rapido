@@ -24,9 +24,10 @@ const STORAGE_KEY = 'calcolo.v1.sessions';
 const MAX_DIGITS = 5;
 
 const $ = (id) => document.getElementById(id);
-const screens = { home: $('home'), game: $('game'), results: $('results') };
+const screens = { login: $('login'), home: $('home'), game: $('game'), results: $('results') };
 
 // ---------- Storage (wrapped: storage can be unavailable) ----------
+// Each session: { id, preset, score, date, slow, synced }.
 function loadSessions() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -35,14 +36,118 @@ function loadSessions() {
     return [];
   }
 }
-function saveSession(session) {
+function storeSessions(all) {
   try {
-    const all = loadSessions();
-    all.push(session);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all.slice(-1000)));
     return true;
   } catch {
     return false;
+  }
+}
+function saveSession(session) {
+  const all = loadSessions();
+  all.push(session);
+  return storeSessions(all);
+}
+function newId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+// Games saved before sync existed have no id: give them one so they upload too.
+function migrateSessions() {
+  const all = loadSessions();
+  if (all.some((s) => !s.id)) storeSessions(all.map((s) => (s.id ? s : { ...s, id: newId(), synced: false })));
+}
+
+// ---------- Sync with Supabase ----------
+const sync = { busy: false, error: '' };
+
+function describeError(error) {
+  if (!error || error.status === undefined) return 'Nessuna connessione: le partite restano sul telefono e partono appena torni online.';
+  if (error.status === 401 || error.status === 403 || error.code === '42501') return 'Account non autorizzato a salvare i dati.';
+  if (error.status === 429) return 'Troppe richieste: riprova tra qualche minuto.';
+  return `Sincronizzazione non riuscita (${error.status}).`;
+}
+
+async function syncNow() {
+  if (sync.busy || !Cloud.signedIn) return;
+  sync.busy = true;
+  sync.error = '';
+  renderAccount();
+  try {
+    const pending = loadSessions().filter((s) => !s.synced);
+    await Cloud.upload(pending.map((s) => ({
+      id: s.id, preset: s.preset, score: s.score, played_at: s.date, slow: s.slow || [],
+    })));
+    const uploaded = new Set(pending.map((s) => s.id));
+    // Merge games that exist only on the server (for example after reinstalling the app).
+    const remote = await Cloud.download();
+    const all = loadSessions().map((s) => (uploaded.has(s.id) ? { ...s, synced: true } : s));
+    const known = new Set(all.map((s) => s.id));
+    for (const r of remote) {
+      if (!known.has(r.id)) all.push({ id: r.id, preset: r.preset, score: r.score, date: r.played_at, slow: r.slow || [], synced: true });
+    }
+    all.sort((a, b) => new Date(a.date) - new Date(b.date));
+    storeSessions(all);
+  } catch (error) {
+    sync.error = describeError(error);
+    if (!Cloud.signedIn) showLogin('La sessione è scaduta: accedi di nuovo.');
+  } finally {
+    sync.busy = false;
+    if (!screens.home.hidden) renderHome(); else renderAccount();
+  }
+}
+
+function renderAccount() {
+  const pending = loadSessions().filter((s) => !s.synced).length;
+  $('account-line').textContent = Cloud.signedIn ? `Accesso come ${Cloud.email}` : 'Non hai effettuato l\'accesso.';
+  const status = $('sync-status');
+  status.classList.toggle('problem', Boolean(sync.error));
+  const pendingText = pending ? `${pending === 1 ? '1 partita da inviare' : `${pending} partite da inviare`}.` : '';
+  if (sync.busy) status.textContent = 'Sincronizzazione in corso…';
+  else if (sync.error) status.textContent = `${pendingText} ${sync.error}`.trim();
+  else if (pending) status.textContent = pendingText;
+  else status.textContent = 'Tutte le partite sono salvate online.';
+  $('sync-now').disabled = sync.busy;
+}
+
+// ---------- Login ----------
+function showLogin(message) {
+  $('login-error').textContent = message || '';
+  show('login');
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const email = $('login-email').value.trim();
+  const password = $('login-password').value;
+  const errorEl = $('login-error');
+  if (!email || !password) {
+    errorEl.textContent = 'Inserisci email e password.';
+    return;
+  }
+  const submit = $('login-submit');
+  submit.disabled = true;
+  submit.textContent = 'Accesso in corso…';
+  errorEl.textContent = '';
+  try {
+    await Cloud.signIn(email, password);
+    $('login-password').value = '';
+    renderHome();
+    show('home');
+    syncNow();
+  } catch (error) {
+    if (error.status === undefined) errorEl.textContent = 'Nessuna connessione. Riprova quando sei online.';
+    else if (error.status === 400) errorEl.textContent = 'Email o password non corrette.';
+    else if (error.status === 429) errorEl.textContent = 'Troppi tentativi: riprova tra qualche minuto.';
+    else errorEl.textContent = `Accesso non riuscito (${error.status}).`;
+  } finally {
+    submit.disabled = false;
+    submit.textContent = 'Accedi';
   }
 }
 
@@ -145,6 +250,8 @@ function renderHome() {
     li.querySelector('strong').textContent = s.score;
     history.append(li);
   }
+
+  renderAccount();
 }
 
 // One line per day for the diary: best score per preset, in preset order.
@@ -337,10 +444,11 @@ function endGame() {
   const before = loadSessions();
   const prev = statsFor(game.preset.id, before);
   const slow = [...game.log].sort((a, b) => b.ms - a.ms).slice(0, 5);
-  const session = { preset: game.preset.id, score: game.score, date: new Date().toISOString(), slow };
+  const session = { id: newId(), preset: game.preset.id, score: game.score, date: new Date().toISOString(), slow, synced: false };
   const saved = saveSession(session);
   renderResults(session, prev, saved);
   show('results');
+  syncNow();
 }
 
 // ---------- Results ----------
@@ -417,6 +525,16 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseGame('left');
+  else if (!game.running) syncNow();
+});
+window.addEventListener('online', () => { if (!game.running) syncNow(); });
+
+$('login-form').addEventListener('submit', handleLogin);
+$('sync-now').addEventListener('click', syncNow);
+$('sign-out').addEventListener('click', async () => {
+  await Cloud.signOut();
+  sync.error = '';
+  showLogin('');
 });
 
 $('quit').addEventListener('click', () => {
@@ -436,8 +554,14 @@ $('copy-today').addEventListener('click', () => {
 });
 
 // ---------- Start ----------
-renderHome();
-show('home');
+migrateSessions();
+if (Cloud.signedIn) {
+  renderHome();
+  show('home');
+  syncNow();
+} else {
+  showLogin('');
+}
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -1,11 +1,12 @@
 'use strict';
 
 // Bump on every release so old caches are dropped.
-const CACHE = 'calcolo-v1';
+const CACHE = 'calcolo-v2';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './cloud.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-180.png',
@@ -15,7 +16,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' skips the HTTP cache so a new release never precaches old files.
+  event.waitUntil(
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
