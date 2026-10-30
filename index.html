@@ -34,6 +34,7 @@
         <input id="login-password" type="password" name="password" autocomplete="current-password" required>
       </label>
     </form>
+    <p class="form-hint">Con il Portachiavi iCloud tocca il campo Email e scegli il tuo account: email e password si compilano da sole.</p>
     <p class="form-error" id="login-error" role="alert"></p>
     <div class="actions">
       <button type="submit" form="login-form" class="button primary" id="login-submit">Accedi</button>
@@ -44,21 +45,27 @@
   <main id="home" class="screen" hidden aria-labelledby="home-title">
     <header class="home-header">
       <h1 id="home-title">Calcolo rapido</h1>
-      <p class="lead">Due minuti. Rispondi a più domande che puoi: la risposta giusta passa da sola.</p>
+      <p class="lead">Due minuti a partita: la risposta giusta passa da sola.</p>
     </header>
 
-    <h2 class="section-title">Allenamenti</h2>
-    <ul class="group" id="preset-list"></ul>
-
-    <h2 class="section-title">Oggi</h2>
-    <div class="group today">
-      <p id="today-summary" class="today-summary">Nessuna partita oggi.</p>
+    <section class="group routine" aria-labelledby="routine-title">
+      <div class="routine-head">
+        <h2 id="routine-title">Scaletta di oggi</h2>
+        <p class="routine-count" id="routine-count"></p>
+      </div>
+      <ol class="steps" id="routine-steps"></ol>
+      <p class="routine-done" id="routine-done" hidden>Scaletta completata. Copia i punteggi per il diario o continua con l'allenamento libero.</p>
+      <button type="button" class="button primary" id="routine-start">Inizia T12</button>
       <button type="button" class="row-button" id="copy-today">Copia i punteggi di oggi</button>
       <p class="inline-status" id="copy-today-status" role="status" aria-live="polite"></p>
-    </div>
+    </section>
+
+    <h2 class="section-title">Allenamento libero</h2>
+    <ul class="group" id="preset-list"></ul>
 
     <h2 class="section-title">Ultime partite</h2>
     <ul class="group history" id="history-list"></ul>
+    <button type="button" class="row-button more" id="history-more" hidden></button>
 
     <h2 class="section-title">Account</h2>
     <div class="group today">
@@ -129,7 +136,9 @@
     <ul class="group slow" id="slow-list"></ul>
 
     <div class="actions">
-      <button type="button" class="button primary" id="again">Rigioca</button>
+      <p class="routine-progress" id="results-routine"></p>
+      <button type="button" class="button primary" id="next-step">Continua</button>
+      <button type="button" class="button" id="again">Rigioca</button>
       <button type="button" class="button" id="copy-result">Copia per il diario</button>
       <p class="inline-status" id="copy-result-status" role="status" aria-live="polite"></p>
       <button type="button" class="button plain" id="to-home">Torna alla home</button>

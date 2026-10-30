@@ -5,17 +5,17 @@
 const PRESETS = [
   {
     id: 't12', name: 'T12', title: 'Tabelline',
-    desc: '× e ÷ · da 2 a 12 per 2 a 12',
+    desc: '× ÷ · 2–12 per 2–12',
     ops: ['mul', 'div'], mul: [[2, 12], [2, 12]],
   },
   {
     id: 't100', name: 'T100', title: 'Una cifra per due cifre',
-    desc: '× e ÷ · da 2 a 12 per 2 a 100',
+    desc: '× ÷ · 2–12 per 2–100',
     ops: ['mul', 'div'], mul: [[2, 12], [2, 100]],
   },
   {
     id: 'def', name: 'Default', title: 'Come Zetamac',
-    desc: '+ − × ÷ · impostazioni standard',
+    desc: '+ − × ÷ · standard',
     ops: ['add', 'sub', 'mul', 'div'], add: [[2, 100], [2, 100]], mul: [[2, 12], [2, 100]],
   },
 ];
@@ -188,9 +188,67 @@ function statsFor(presetId, sessions) {
   };
 }
 
+// ---------- Daily routine ----------
+// The diary routine: 1 × T12 warm-up, 2 × T100, 1 × Default. Today's games fill the slots in order.
+const ROUTINE = ['t12', 't100', 't100', 'def'];
+const ORDINALS = ['', 'prima', 'seconda', 'terza'];
+
+function routineToday(sessions) {
+  const today = localDay(Date.now());
+  const slots = ROUTINE.map((preset, i) => ({
+    preset,
+    score: null,
+    nth: ROUTINE.slice(0, i + 1).filter((p) => p === preset).length,
+    repeats: ROUTINE.filter((p) => p === preset).length > 1,
+  }));
+  for (const s of sessions) {
+    if (localDay(s.date) !== today) continue;
+    const slot = slots.find((x) => x.preset === s.preset && x.score === null);
+    if (slot) slot.score = s.score;
+  }
+  const next = slots.find((x) => x.score === null) || null;
+  return { slots, next, done: slots.filter((x) => x.score !== null).length };
+}
+
+function slotLabel(slot) {
+  const name = presetById(slot.preset).name;
+  return slot.repeats ? `${name}, ${ORDINALS[slot.nth]} partita` : name;
+}
+
+function renderRoutine(sessions) {
+  const { slots, next, done } = routineToday(sessions);
+  $('routine-count').textContent = `${done} di ${slots.length}`;
+  const list = $('routine-steps');
+  list.replaceChildren();
+  for (const slot of slots) {
+    const li = document.createElement('li');
+    const state = slot.score !== null ? 'done' : slot === next ? 'current' : 'todo';
+    li.className = `step ${state}`;
+    li.innerHTML = '<span class="step-name"></span><span class="step-score"></span>';
+    li.querySelector('.step-name').textContent = presetById(slot.preset).name;
+    li.querySelector('.step-score').textContent = slot.score !== null ? `✓ ${slot.score}` : state === 'current' ? 'adesso' : '';
+    li.setAttribute('aria-label', `${slotLabel(slot)}: ${slot.score !== null ? `fatta, ${slot.score} punti` : state === 'current' ? 'la prossima' : 'da fare'}`);
+    list.append(li);
+  }
+  const start = $('routine-start');
+  start.hidden = !next;
+  $('routine-done').hidden = Boolean(next);
+  if (next) {
+    start.textContent = `Inizia ${presetById(next.preset).name}${next.repeats ? ` (${ORDINALS[next.nth]})` : ''}`;
+    start.dataset.preset = next.preset;
+  }
+  $('copy-today').hidden = !todaySummary(sessions);
+  $('copy-today-status').textContent = '';
+}
+
 // ---------- Home ----------
+const HISTORY_SHORT = 5;
+const HISTORY_LONG = 30;
+let historyExpanded = false;
+
 function renderHome() {
   const sessions = loadSessions();
+  renderRoutine(sessions);
 
   const list = $('preset-list');
   list.replaceChildren();
@@ -201,37 +259,36 @@ function renderHome() {
     button.type = 'button';
     button.className = 'preset-row';
     button.setAttribute('aria-label',
-      `Inizia ${preset.name}, ${preset.title}. ${stats ? `Record ${stats.best}, ultima ${stats.last}.` : 'Nessuna partita ancora.'}`);
+      `Gioca ${preset.name}, ${preset.title}, ${preset.desc}. ${stats ? `Record ${stats.best}.` : 'Nessuna partita ancora.'}`);
     button.innerHTML = `
-      <span class="badge" aria-hidden="true"></span>
+      <span class="preset-name" aria-hidden="true"></span>
       <span class="preset-text" aria-hidden="true">
         <span class="preset-title"></span>
         <span class="preset-desc"></span>
       </span>
-      <span class="preset-stats" aria-hidden="true"></span>`;
-    button.querySelector('.badge').textContent = preset.name;
+      <span class="preset-stats" aria-hidden="true"></span>
+      <svg class="chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>`;
+    button.querySelector('.preset-name').textContent = preset.name;
     button.querySelector('.preset-title').textContent = preset.title;
     button.querySelector('.preset-desc').textContent = preset.desc;
     const statsEl = button.querySelector('.preset-stats');
     if (stats) {
-      statsEl.innerHTML = '<strong></strong><span></span>';
+      statsEl.innerHTML = '<strong></strong><span>record</span>';
       statsEl.querySelector('strong').textContent = stats.best;
-      statsEl.querySelector('span').textContent = `record · ultima ${stats.last}`;
-    } else {
-      statsEl.textContent = 'Inizia';
     }
     button.addEventListener('click', () => startGame(preset.id));
     li.append(button);
     list.append(li);
   }
 
-  $('today-summary').textContent = todaySummary(sessions) || 'Nessuna partita oggi.';
-  $('copy-today').hidden = !todaySummary(sessions);
-  $('copy-today-status').textContent = '';
-
   const history = $('history-list');
   history.replaceChildren();
-  const recent = sessions.slice(-15).reverse();
+  const limit = historyExpanded ? HISTORY_LONG : HISTORY_SHORT;
+  const recent = sessions.slice(-limit).reverse();
+  const more = $('history-more');
+  more.hidden = sessions.length <= HISTORY_SHORT;
+  more.textContent = historyExpanded ? 'Mostra meno' : `Mostra le ultime ${Math.min(sessions.length, HISTORY_LONG)}`;
+  more.setAttribute('aria-expanded', String(historyExpanded));
   if (!recent.length) {
     const li = document.createElement('li');
     li.className = 'empty';
@@ -491,7 +548,27 @@ function renderResults(session, prev, saved) {
     list.append(li);
   }
   $('copy-result-status').textContent = '';
-  $('again').focus();
+
+  // One prominent action: the next routine step if there is one, otherwise play again.
+  const { slots, next, done } = routineToday(loadSessions());
+  const nextButton = $('next-step');
+  const again = $('again');
+  $('results-routine').textContent = next
+    ? `Scaletta di oggi: ${done} di ${slots.length}. Prossima: ${slotLabel(next)}.`
+    : `Scaletta di oggi completata (${slots.length} di ${slots.length}).`;
+  if (next) {
+    nextButton.hidden = false;
+    nextButton.textContent = `Continua: ${presetById(next.preset).name}${next.repeats ? ` (${ORDINALS[next.nth]})` : ''}`;
+    nextButton.dataset.preset = next.preset;
+    again.hidden = next.preset === session.preset;
+    again.classList.remove('primary');
+  } else {
+    nextButton.hidden = true;
+    again.hidden = false;
+    again.classList.add('primary');
+  }
+  again.textContent = `Rigioca ${preset.name}`;
+  (next ? nextButton : again).focus();
 }
 
 // ---------- Events ----------
@@ -543,6 +620,12 @@ $('quit').addEventListener('click', () => {
 $('resume').addEventListener('click', resumeGame);
 $('pause-quit').addEventListener('click', quitGame);
 $('again').addEventListener('click', () => startGame(game.preset.id));
+$('next-step').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
+$('routine-start').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
+$('history-more').addEventListener('click', () => {
+  historyExpanded = !historyExpanded;
+  renderHome();
+});
 $('to-home').addEventListener('click', () => { renderHome(); show('home'); });
 $('copy-result').addEventListener('click', () => {
   const s = loadSessions().at(-1);
