@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump on every release so old caches are dropped.
-const CACHE = 'calcolo-v4';
+const CACHE = 'calcolo-v5';
 const ASSETS = [
   './',
   './index.html',

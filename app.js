@@ -325,9 +325,15 @@ const game = {
   countdownTimer: 0,
 };
 
+let updatePending = false;
+function applyPendingUpdate() {
+  if (updatePending && (!screens.home.hidden || !screens.login.hidden)) location.reload();
+}
+
 function show(name) {
   for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
   window.scrollTo(0, 0);
+  applyPendingUpdate();
 }
 
 function startGame(presetId) {
@@ -606,5 +612,13 @@ if (Cloud.signedIn) {
 }
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  // A new release takes control in the background: reload once to show it,
+  // only from the home or sign-in screen so a game or its results are never cut off.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return; // first install: the page is already current
+    updatePending = true;
+    applyPendingUpdate();
+  });
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
