@@ -108,7 +108,7 @@ const Cloud = (() => {
   }
 
   async function download() {
-    const response = await rest('sessions?select=id,preset,score,played_at,slow&order=played_at.asc&limit=10000');
+    const response = await rest('sessions?select=id,preset,score,played_at,slow,source&order=played_at.asc&limit=10000');
     return response.json();
   }
 

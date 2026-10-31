@@ -89,7 +89,7 @@ async function syncNow() {
     const all = loadSessions().map((s) => (uploaded.has(s.id) ? { ...s, synced: true } : s));
     const known = new Set(all.map((s) => s.id));
     for (const r of remote) {
-      if (!known.has(r.id)) all.push({ id: r.id, preset: r.preset, score: r.score, date: r.played_at, slow: r.slow || [], synced: true });
+      if (!known.has(r.id)) all.push({ id: r.id, preset: r.preset, score: r.score, date: r.played_at, slow: r.slow || [], source: r.source || 'app', synced: true });
     }
     all.sort((a, b) => new Date(a.date) - new Date(b.date));
     storeSessions(all);
@@ -202,7 +202,7 @@ function routineToday(sessions) {
     repeats: ROUTINE.filter((p) => p === preset).length > 1,
   }));
   for (const s of sessions) {
-    if (localDay(s.date) !== today) continue;
+    if (localDay(s.date) !== today || s.source === 'diario') continue;
     const slot = slots.find((x) => x.preset === s.preset && x.score === null);
     if (slot) slot.score = s.score;
   }
@@ -239,6 +239,199 @@ function renderRoutine(sessions) {
   }
 }
 
+// ---------- Streak ----------
+// A day counts when at least one game was played (in the app or written in the diary).
+const dayNumber = (date) => {
+  const d = new Date(date);
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+};
+
+function streakStats(sessions) {
+  const days = [...new Set(sessions.map((s) => dayNumber(s.date)))].sort((a, b) => a - b);
+  const set = new Set(days);
+  const today = dayNumber(Date.now());
+  let best = 0;
+  let run = 0;
+  let prev = null;
+  for (const d of days) {
+    run = prev !== null && d === prev + 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  }
+  // Today not played yet: the streak is still alive if yesterday was.
+  let current = 0;
+  let cursor = set.has(today) ? today : today - 1;
+  while (set.has(cursor)) { current += 1; cursor -= 1; }
+  return { current, best, playedToday: set.has(today) };
+}
+
+function renderStreak(sessions) {
+  const { current, best, playedToday } = streakStats(sessions);
+  const box = $('streak');
+  box.classList.toggle('active', current > 0 && playedToday);
+  $('streak-count').textContent = current;
+  $('streak-unit').textContent = current === 1 ? 'giorno di fila' : 'giorni di fila';
+  let status;
+  if (current === 0) status = sessions.length ? 'Gioca oggi per ripartire.' : 'Gioca la prima partita per iniziare.';
+  else if (playedToday) status = 'Oggi fatto. Torna domani per allungarla.';
+  else status = 'Gioca oggi per non perderla.';
+  $('streak-status').textContent = `${status}${best > 1 ? ` Record: ${best}.` : ''}`;
+  box.setAttribute('aria-label', `Streak: ${current} ${$('streak-unit').textContent}. ${$('streak-status').textContent}`);
+}
+
+// ---------- Trend chart ----------
+const CHART_KEY = 'calcolo.v1.chart';
+let chartPreset = (() => { try { return localStorage.getItem(CHART_KEY) || 't100'; } catch { return 't100'; } })();
+let chartPoints = [];
+let chartFocus = -1;
+
+// Best score per day for one preset; the marker shows where that best came from.
+function chartData(sessions, presetId) {
+  const byDay = new Map();
+  for (const s of sessions) {
+    if (s.preset !== presetId) continue;
+    const day = dayNumber(s.date);
+    const entry = byDay.get(day) || { day, date: s.date, best: -1, source: 'app', games: 0 };
+    entry.games += 1;
+    if (s.score > entry.best || (s.score === entry.best && s.source !== 'diario')) {
+      entry.best = s.score;
+      entry.source = s.source === 'diario' ? 'diario' : 'app';
+    }
+    byDay.set(day, entry);
+  }
+  return [...byDay.values()].sort((a, b) => a.day - b.day);
+}
+
+const dayLabel = (date) => new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(name, attrs, parent) {
+  const el = document.createElementNS(SVG_NS, name);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (parent) parent.append(el);
+  return el;
+}
+
+function renderChart(sessions) {
+  for (const button of document.querySelectorAll('#chart-presets button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.preset === chartPreset));
+  }
+  const preset = presetById(chartPreset);
+  const points = chartData(sessions, chartPreset);
+  chartPoints = points;
+  chartFocus = -1;
+  const stats = statsFor(chartPreset, sessions);
+  $('chart-title').textContent = `${preset.name}: migliore punteggio del giorno`;
+  $('chart-summary').textContent = stats ? `Record ${stats.best} · ${points.length} ${points.length === 1 ? 'giorno' : 'giorni'}` : '';
+  $('chart-legend').hidden = !points.some((p) => p.source === 'diario');
+  hideTooltip();
+
+  const svg = $('chart');
+  svg.replaceChildren();
+  $('chart-empty').hidden = points.length > 0;
+  svg.style.display = points.length ? '' : 'none';
+  renderChartTable(points);
+  if (!points.length) return;
+
+  const width = Math.max(260, svg.parentElement.clientWidth);
+  const height = 180;
+  const pad = { top: 16, right: 30, bottom: 26, left: 30 };
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('height', height);
+
+  const maxScore = Math.max(...points.map((p) => p.best));
+  // Top tick a multiple of two steps, so the middle gridline is a round number too,
+  // with a little headroom above the highest point.
+  const step = maxScore > 60 ? 25 : maxScore > 30 ? 10 : 5;
+  let yMax = Math.max(step * 2, Math.ceil(maxScore / (step * 2)) * step * 2);
+  if (maxScore > yMax * 0.97) yMax += step * 2;
+  const first = points[0].day;
+  const last = points[points.length - 1].day;
+  const x = (day) => (first === last
+    ? pad.left + (width - pad.left - pad.right) / 2
+    : pad.left + ((day - first) / (last - first)) * (width - pad.left - pad.right));
+  const y = (v) => pad.top + (1 - v / yMax) * (height - pad.top - pad.bottom);
+
+  // Recessive hairline grid: 0, half, top.
+  for (const v of [0, yMax / 2, yMax]) {
+    svgEl('line', { x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v), class: 'grid' }, svg);
+    svgEl('text', { x: pad.left - 6, y: y(v) + 4, class: 'tick', 'text-anchor': 'end' }, svg).textContent = Math.round(v);
+  }
+  svgEl('text', { x: x(first), y: height - 6, class: 'tick', 'text-anchor': first === last ? 'middle' : 'start' }, svg).textContent = dayLabel(points[0].date);
+  if (first !== last) {
+    svgEl('text', { x: x(last), y: height - 6, class: 'tick', 'text-anchor': 'end' }, svg).textContent = dayLabel(points[points.length - 1].date);
+  }
+
+  if (points.length > 1) {
+    svgEl('path', { d: points.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.best).toFixed(1)}`).join(' '), class: 'series-line' }, svg);
+  }
+  svgEl('line', { x1: 0, x2: 0, y1: pad.top, y2: height - pad.bottom, class: 'crosshair', id: 'chart-crosshair', visibility: 'hidden' }, svg);
+  points.forEach((p, i) => {
+    p.cx = x(p.day);
+    p.cy = y(p.best);
+    svgEl('circle', { cx: p.cx, cy: p.cy, r: 4, class: p.source === 'diario' ? 'dot hollow' : 'dot', 'data-index': i }, svg);
+  });
+  // Direct label on the latest value only.
+  const lastPoint = points[points.length - 1];
+  svgEl('text', { x: lastPoint.cx + 8, y: lastPoint.cy + 4, class: 'end-label' }, svg).textContent = lastPoint.best;
+  svg.setAttribute('aria-label', `Andamento ${preset.name}: ${points.length} giorni, ultimo ${lastPoint.best}, record ${stats.best}. Tocca il grafico o usa le frecce per leggere i valori.`);
+}
+
+function renderChartTable(points) {
+  const body = $('chart-table-body');
+  body.replaceChildren();
+  for (const p of [...points].reverse()) {
+    const tr = document.createElement('tr');
+    for (const text of [dayLabel(p.date), String(p.best), p.source === 'diario' ? 'Zetamac (diario)' : 'App', String(p.games)]) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+}
+
+function showTooltip(index) {
+  const p = chartPoints[index];
+  if (!p) return;
+  chartFocus = index;
+  const svg = $('chart');
+  const cross = $('chart-crosshair');
+  cross.setAttribute('x1', p.cx);
+  cross.setAttribute('x2', p.cx);
+  cross.setAttribute('visibility', 'visible');
+  for (const dot of svg.querySelectorAll('.dot')) dot.classList.toggle('focus', Number(dot.dataset.index) === index);
+  const tip = $('chart-tooltip');
+  tip.replaceChildren();
+  const value = document.createElement('strong');
+  value.textContent = `${p.best} punti`;
+  const detail = document.createElement('span');
+  detail.textContent = `${dayLabel(p.date)} · ${p.source === 'diario' ? 'Zetamac (diario)' : 'app'} · ${p.games} ${p.games === 1 ? 'partita' : 'partite'}`;
+  tip.append(value, detail);
+  tip.hidden = false;
+  // Position in CSS pixels: the SVG viewBox matches its rendered width.
+  const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+  const left = Math.min(Math.max(p.cx * scale - tip.offsetWidth / 2, 0), svg.clientWidth - tip.offsetWidth);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${Math.max(0, p.cy * scale - tip.offsetHeight - 14)}px`;
+}
+
+function hideTooltip() {
+  const tip = $('chart-tooltip');
+  if (tip) tip.hidden = true;
+  const cross = document.getElementById('chart-crosshair');
+  if (cross) cross.setAttribute('visibility', 'hidden');
+  for (const dot of document.querySelectorAll('#chart .dot.focus')) dot.classList.remove('focus');
+}
+
+function nearestPoint(event) {
+  const svg = $('chart');
+  const rect = svg.getBoundingClientRect();
+  const px = ((event.clientX - rect.left) / rect.width) * svg.viewBox.baseVal.width;
+  let best = 0;
+  chartPoints.forEach((p, i) => { if (Math.abs(p.cx - px) < Math.abs(chartPoints[best].cx - px)) best = i; });
+  return best;
+}
+
 // ---------- Home ----------
 const HISTORY_SHORT = 5;
 const HISTORY_LONG = 30;
@@ -246,7 +439,9 @@ let historyExpanded = false;
 
 function renderHome() {
   const sessions = loadSessions();
+  renderStreak(sessions);
   renderRoutine(sessions);
+  renderChart(sessions);
 
   const list = $('preset-list');
   list.replaceChildren();
@@ -301,7 +496,7 @@ function renderHome() {
     li.querySelector('.when').textContent =
       d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' · ' +
       d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-    li.querySelector('.p').textContent = preset ? preset.name : s.preset;
+    li.querySelector('.p').textContent = `${preset ? preset.name : s.preset}${s.source === 'diario' ? ' · Zetamac' : ''}`;
     li.querySelector('strong').textContent = s.score;
     history.append(li);
   }
@@ -595,6 +790,30 @@ $('pause-quit').addEventListener('click', quitGame);
 $('again').addEventListener('click', () => startGame(game.preset.id));
 $('next-step').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
 $('routine-start').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
+$('chart-presets').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-preset]');
+  if (!button) return;
+  chartPreset = button.dataset.preset;
+  try { localStorage.setItem(CHART_KEY, chartPreset); } catch { /* remembered for this session only */ }
+  renderChart(loadSessions());
+});
+$('chart').addEventListener('pointerdown', (event) => { if (chartPoints.length) showTooltip(nearestPoint(event)); });
+$('chart').addEventListener('pointermove', (event) => { if (chartPoints.length) showTooltip(nearestPoint(event)); });
+$('chart').addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') hideTooltip(); });
+$('chart').addEventListener('blur', hideTooltip);
+$('chart').addEventListener('keydown', (event) => {
+  if (!chartPoints.length || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const lastIndex = chartPoints.length - 1;
+  const from = chartFocus < 0 ? lastIndex + (event.key === 'ArrowLeft' ? 1 : 0) : chartFocus;
+  const next = { ArrowLeft: from - 1, ArrowRight: from + 1, Home: 0, End: lastIndex }[event.key];
+  showTooltip(Math.min(Math.max(next, 0), lastIndex));
+});
+let resizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (!screens.home.hidden) renderChart(loadSessions()); }, 150);
+});
 $('history-more').addEventListener('click', () => {
   historyExpanded = !historyExpanded;
   renderHome();

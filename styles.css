@@ -10,6 +10,7 @@
   --tile: #EFEFF4;        /* routine steps; label2 on it 5.8:1 */
   --tint: #E3EDFB;        /* current step; accent on it 4.98:1 */
   --accent: #0A5FD1;      /* 5.88:1 as text on card; white on it 5.88:1 */
+  --series: #0A5FD1;      /* chart line, validated (dataviz validate_palette, light) */
   --on-accent: #FFFFFF;
   --signal: #9A5700;      /* record badge, 5.62:1 on card */
   --key: #FFFFFF;
@@ -34,6 +35,7 @@
     --tile: #2C2C2E;      /* label2 on it 6.3:1 */
     --tint: #15263F;      /* accent on it 5.34:1 */
     --accent: #4C9AFF;    /* 5.97:1 as text on card */
+    --series: #3D8BF7;    /* chart line, validated (dataviz validate_palette, dark) */
     --accent-fill: #2F7CF6; /* white bold text on it: 3.94:1 (bold >= 3:1) */
     --signal: #FFB340;    /* 9.54:1 on card */
     --key: #2C2C2E;       /* white text 13.94:1 */
@@ -168,6 +170,81 @@ button { font: inherit; color: inherit; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Streak: the achievement color (signal), always with a number and a sentence. */
+.streak { display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 16px; }
+.flame { width: 36px; height: 36px; flex: none; }
+.flame path { fill: none; stroke: var(--label2); stroke-width: 1.6; stroke-linejoin: round; }
+.flame .flame-inner { stroke-width: 1.2; }
+.streak.active .flame-outer { fill: var(--signal); stroke: var(--signal); }
+.streak.active .flame-inner { fill: var(--card); stroke: var(--card); }
+.streak-text { min-width: 0; }
+.streak-main { margin: 0; font-weight: 600; }
+.streak-count { font-family: var(--font-num); font-weight: 800; font-size: 1.6rem; vertical-align: -0.1em; }
+.streak-status { margin: 2px 0 0; color: var(--label2); font-size: 0.85rem; line-height: 1.35; }
+
+/* Trend chart: one series per view, picked with a segmented control. */
+.chart-card { padding: 12px 16px 14px; }
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--tile);
+}
+.segmented button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--font-num);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.segmented button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+@media (prefers-color-scheme: dark) {
+  .segmented button[aria-pressed="true"] { background: var(--key-down); }
+}
+.segmented button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.chart-title { margin: 14px 0 2px; font-size: 1rem; font-weight: 600; }
+.chart-summary { margin: 0 0 6px; color: var(--label2); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.chart-wrap { position: relative; }
+.chart { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
+.chart:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.chart .grid { stroke: var(--sep); stroke-width: 1; }
+.chart .tick { fill: var(--label2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .series-line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .crosshair { stroke: var(--label2); stroke-width: 1; }
+.chart-legend .dot, .chart .dot { fill: var(--series); stroke: var(--card); stroke-width: 2; }
+.chart-legend .dot.hollow, .chart .dot.hollow { fill: var(--card); stroke: var(--series); stroke-width: 2; }
+.chart .dot.focus { r: 6; }
+.chart .end-label { fill: var(--label); font-size: 12px; font-weight: 700; font-family: var(--font-num); }
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  border: 0.5px solid var(--sep);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.chart-tooltip strong { font-family: var(--font-num); font-size: 1rem; }
+.chart-tooltip span { color: var(--label2); }
+.chart-empty { margin: 16px 0; color: var(--label2); text-align: center; }
+.chart-legend { display: flex; gap: 16px; margin: 6px 0 0; color: var(--label2); font-size: 0.8rem; }
+.chart-legend .legend-key { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend svg { width: 12px; height: 12px; }
+.chart-data { margin-top: 8px; }
+.chart-data summary { color: var(--accent); font-weight: 600; cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.chart-data table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.chart-data th { text-align: left; color: var(--label2); font-weight: 600; padding: 4px 0; border-bottom: 0.5px solid var(--sep); }
+.chart-data td { padding: 6px 0; border-bottom: 0.5px solid var(--sep); }
 
 /* Daily routine: the one prominent action on the home screen. */
 .routine { padding: 16px; container-type: inline-size; }

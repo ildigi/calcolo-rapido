@@ -48,6 +48,17 @@
       <p class="lead">Due minuti a partita: la risposta giusta passa da sola.</p>
     </header>
 
+    <div class="group streak" id="streak" role="group">
+      <svg class="flame" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="flame-outer" d="M13.2 1.8c.4 3.1 2.4 4.6 4 6.6 1.4 1.7 2.3 3.6 2.3 5.9a7.5 7.5 0 0 1-15 0c0-2.6 1.1-4.6 2.8-6.3.1 1.6.7 2.9 1.9 3.8C8.9 8 10.6 4.6 13.2 1.8Z"/>
+        <path class="flame-inner" d="M12.2 12.2c.4 1.5 1.5 2.3 2.2 3.4.4.6.6 1.2.6 1.9a3 3 0 0 1-6 0c0-1 .4-1.9 1.1-2.6.2.6.5 1 1 1.3-.1-1.4.3-2.8 1.1-4Z"/>
+      </svg>
+      <div class="streak-text" aria-hidden="true">
+        <p class="streak-main"><span class="streak-count" id="streak-count">0</span> <span id="streak-unit">giorni di fila</span></p>
+        <p class="streak-status" id="streak-status"></p>
+      </div>
+    </div>
+
     <section class="group routine" aria-labelledby="routine-title">
       <div class="routine-head">
         <h2 id="routine-title">Scaletta di oggi</h2>
@@ -56,6 +67,33 @@
       <ol class="steps" id="routine-steps"></ol>
       <p class="routine-done" id="routine-done" hidden>Scaletta completata: i punteggi arrivano da soli nel diario. Puoi continuare con l'allenamento libero.</p>
       <button type="button" class="button primary" id="routine-start">Inizia T12</button>
+    </section>
+
+    <h2 class="section-title">Andamento</h2>
+    <section class="group chart-card" aria-labelledby="chart-title">
+      <div class="segmented" id="chart-presets" role="group" aria-label="Allenamento da mostrare">
+        <button type="button" data-preset="t12">T12</button>
+        <button type="button" data-preset="t100">T100</button>
+        <button type="button" data-preset="def">Default</button>
+      </div>
+      <h3 class="chart-title" id="chart-title"></h3>
+      <p class="chart-summary" id="chart-summary"></p>
+      <div class="chart-wrap">
+        <svg id="chart" class="chart" role="img" tabindex="0" width="100%"></svg>
+        <div class="chart-tooltip" id="chart-tooltip" role="status" aria-live="polite" hidden></div>
+      </div>
+      <p class="chart-empty" id="chart-empty" hidden>Ancora nessuna partita con questo allenamento.</p>
+      <p class="chart-legend" id="chart-legend" hidden>
+        <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot"/></svg> app</span>
+        <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot hollow"/></svg> Zetamac (dal diario)</span>
+      </p>
+      <details class="chart-data">
+        <summary>Mostra i valori</summary>
+        <table>
+          <thead><tr><th scope="col">Giorno</th><th scope="col">Migliore</th><th scope="col">Dove</th><th scope="col">Partite</th></tr></thead>
+          <tbody id="chart-table-body"></tbody>
+        </table>
+      </details>
     </section>
 
     <h2 class="section-title">Allenamento libero</h2>
