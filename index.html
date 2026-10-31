@@ -56,6 +56,7 @@
       <div class="streak-text" aria-hidden="true">
         <p class="streak-main"><span class="streak-count" id="streak-count">0</span> <span id="streak-unit">giorni di fila</span></p>
         <p class="streak-status" id="streak-status"></p>
+        <p class="streak-record" id="streak-record" hidden></p>
       </div>
     </div>
 
@@ -102,6 +103,15 @@
     <h2 class="section-title">Ultime partite</h2>
     <ul class="group history" id="history-list"></ul>
     <button type="button" class="row-button more" id="history-more" hidden></button>
+
+    <h2 class="section-title">Promemoria</h2>
+    <div class="group today">
+      <p class="today-summary" id="push-line">Promemoria alle 10:00 e avviso streak alle 21:30, solo nei giorni in cui non hai ancora giocato.</p>
+      <p class="sync-status" id="push-status" role="status" aria-live="polite"></p>
+      <button type="button" class="button" id="push-enable" hidden>Attiva promemoria</button>
+      <button type="button" class="row-button" id="push-test" hidden>Invia una notifica di prova</button>
+      <button type="button" class="row-button" id="push-disable" hidden>Disattiva promemoria</button>
+    </div>
 
     <h2 class="section-title">Account</h2>
     <div class="group today">

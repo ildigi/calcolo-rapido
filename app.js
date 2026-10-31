@@ -93,6 +93,9 @@ async function syncNow() {
     }
     all.sort((a, b) => new Date(a.date) - new Date(b.date));
     storeSessions(all);
+    // Keep this device's push subscription current on the server (it can change over time).
+    const subscription = await currentSubscription().catch(() => null);
+    if (subscription && Notification.permission === 'granted') await Cloud.savePushSubscription(subscription);
   } catch (error) {
     sync.error = describeError(error);
     if (!Cloud.signedIn) showLogin('La sessione è scaduta: accedi di nuovo.');
@@ -113,6 +116,114 @@ function renderAccount() {
   else if (pending) status.textContent = pendingText;
   else status.textContent = 'Tutte le partite sono salvate online.';
   $('sync-now').disabled = sync.busy;
+}
+
+// ---------- Push reminders ----------
+// Public half of the VAPID pair created by the "promemoria" Edge Function (the private half stays in Supabase Vault).
+const VAPID_PUBLIC_KEY = 'BJWwc9WuLgFm4E-hvPKWREHzoRdhTK6dA6lHyh2hXYfKM6gN2_DVgMGwdgIQic5WKxwYRYd_ILYdD2hw5y3lj7c';
+const pushState = { busy: false, message: '', problem: false };
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isStandalone = () => window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+function keyBytes(base64url) {
+  const base64 = (base64url + '='.repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+}
+
+async function currentSubscription() {
+  if (!pushSupported()) return null;
+  const registration = await navigator.serviceWorker.getRegistration();
+  return registration ? registration.pushManager.getSubscription() : null;
+}
+
+async function renderPush() {
+  const enable = $('push-enable');
+  const test = $('push-test');
+  const disable = $('push-disable');
+  const status = $('push-status');
+  enable.hidden = true;
+  test.hidden = true;
+  disable.hidden = true;
+  status.classList.toggle('problem', pushState.problem);
+  if (!pushSupported()) {
+    status.textContent = isStandalone()
+      ? 'Questo iPhone non supporta le notifiche delle web app: serve iOS 16.4 o successivo.'
+      : 'Per ricevere i promemoria apri l\'app dall\'icona sulla schermata Home.';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    status.textContent = 'Notifiche bloccate. Riattivale in Impostazioni → Notifiche → Calcolo.';
+    status.classList.add('problem');
+    return;
+  }
+  const subscription = await currentSubscription().catch(() => null);
+  const busyText = pushState.busy ? 'Un momento…' : '';
+  if (subscription && Notification.permission === 'granted') {
+    status.textContent = busyText || pushState.message || 'Promemoria attivi su questo dispositivo.';
+    test.hidden = false;
+    disable.hidden = false;
+  } else {
+    status.textContent = busyText || pushState.message || 'Promemoria non attivi su questo dispositivo.';
+    enable.hidden = false;
+  }
+  for (const button of [enable, test, disable]) button.disabled = pushState.busy;
+}
+
+async function runPushAction(action) {
+  if (pushState.busy) return;
+  pushState.busy = true;
+  pushState.message = '';
+  pushState.problem = false;
+  renderPush();
+  try {
+    pushState.message = await action();
+  } catch (error) {
+    pushState.problem = true;
+    pushState.message = error && error.status !== undefined
+      ? `Operazione non riuscita (${error.status}). Riprova tra poco.`
+      : 'Operazione non riuscita: controlla la connessione e riprova.';
+  } finally {
+    pushState.busy = false;
+    renderPush();
+  }
+}
+
+function enablePush() {
+  // iOS only shows the permission prompt when it is requested right inside the tap.
+  const permission = Notification.requestPermission();
+  runPushAction(async () => {
+    const result = await permission;
+    if (result !== 'granted') {
+      pushState.problem = true;
+      return 'Permesso non concesso: senza permesso iOS non mostra le notifiche.';
+    }
+    const registration = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('sw.js'));
+    await navigator.serviceWorker.ready;
+    const subscription = (await registration.pushManager.getSubscription())
+      || (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY) }));
+    await Cloud.savePushSubscription(subscription);
+    return 'Promemoria attivi. Prova con "Invia una notifica di prova".';
+  });
+}
+
+function testPush() {
+  runPushAction(async () => {
+    const result = await Cloud.sendTestPush();
+    if (result.sent > 0) return 'Notifica inviata: dovrebbe arrivare tra pochi secondi.';
+    pushState.problem = true;
+    return 'Nessun dispositivo registrato: disattiva e riattiva i promemoria.';
+  });
+}
+
+function disablePush() {
+  runPushAction(async () => {
+    const subscription = await currentSubscription();
+    if (subscription) {
+      await Cloud.deletePushSubscription(subscription.endpoint);
+      await subscription.unsubscribe();
+    }
+    return 'Promemoria disattivati su questo dispositivo.';
+  });
 }
 
 // ---------- Login ----------
@@ -275,8 +386,11 @@ function renderStreak(sessions) {
   if (current === 0) status = sessions.length ? 'Gioca oggi per ripartire.' : 'Gioca la prima partita per iniziare.';
   else if (playedToday) status = 'Oggi fatto. Torna domani per allungarla.';
   else status = 'Gioca oggi per non perderla.';
-  $('streak-status').textContent = `${status}${best > 1 ? ` Record: ${best}.` : ''}`;
-  box.setAttribute('aria-label', `Streak: ${current} ${$('streak-unit').textContent}. ${$('streak-status').textContent}`);
+  $('streak-status').textContent = status;
+  const record = $('streak-record');
+  record.hidden = best < 2;
+  record.textContent = `Record: ${best} ${best === 1 ? 'giorno' : 'giorni'}`;
+  box.setAttribute('aria-label', `Streak: ${current} ${$('streak-unit').textContent}. ${status}${best > 1 ? ` Record: ${best} giorni.` : ''}`);
 }
 
 // ---------- Trend chart ----------
@@ -328,6 +442,7 @@ function renderChart(sessions) {
   const svg = $('chart');
   svg.replaceChildren();
   $('chart-empty').hidden = points.length > 0;
+  document.querySelector('.chart-data').hidden = points.length === 0;
   svg.style.display = points.length ? '' : 'none';
   renderChartTable(points);
   if (!points.length) return;
@@ -442,6 +557,7 @@ function renderHome() {
   renderStreak(sessions);
   renderRoutine(sessions);
   renderChart(sessions);
+  renderPush();
 
   const list = $('preset-list');
   list.replaceChildren();
@@ -790,6 +906,9 @@ $('pause-quit').addEventListener('click', quitGame);
 $('again').addEventListener('click', () => startGame(game.preset.id));
 $('next-step').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
 $('routine-start').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
+$('push-enable').addEventListener('click', enablePush);
+$('push-test').addEventListener('click', testPush);
+$('push-disable').addEventListener('click', disablePush);
 $('chart-presets').addEventListener('click', (event) => {
   const button = event.target.closest('button[data-preset]');
   if (!button) return;

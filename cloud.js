@@ -112,11 +112,39 @@ const Cloud = (() => {
     return response.json();
   }
 
+  // Push subscription of this device (one row per endpoint).
+  async function savePushSubscription(subscription) {
+    const data = subscription.toJSON();
+    await rest('push_subscriptions?on_conflict=endpoint', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ endpoint: data.endpoint, p256dh: data.keys.p256dh, auth: data.keys.auth }]),
+    });
+  }
+
+  async function deletePushSubscription(endpoint) {
+    await rest(`push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, { method: 'DELETE' });
+  }
+
+  async function sendTestPush() {
+    const token = await accessToken();
+    const response = await fetch(`${BASE}/functions/v1/promemoria`, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'test' }),
+    });
+    if (!response.ok) throw await errorFrom(response);
+    return response.json();
+  }
+
   return {
     signIn,
     signOut,
     upload,
     download,
+    savePushSubscription,
+    deletePushSubscription,
+    sendTestPush,
     get signedIn() { return Boolean(auth); },
     get email() { return auth ? auth.email : ''; },
   };
