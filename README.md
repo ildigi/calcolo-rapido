@@ -12,7 +12,12 @@ Presets:
 
 Subtraction is addition in reverse and division is multiplication in reverse, as in Zetamac.
 
-Features: on-screen keypad (and physical keyboard), automatic pause when the app goes to the background, the five slowest problems of each game, personal best and last score per preset, and a daily routine (1 × T12, 2 × T100, 1 × Default) that guides the next game.
+Features: on-screen keypad (and physical keyboard), automatic pause when the app goes to the background, the five slowest problems of each game, and four tabs:
+
+- **Gioca**: streak, daily routine (1 × T12, 2 × T100, 1 × Default) that guides the next game, free play.
+- **Record**: best score per preset, trend chart, recent games.
+- **Obiettivi**: Default-mode milestones towards a target date, and streak milestones.
+- **Impostazioni**: daily push reminders (10:00, and 21:30 when a streak is at risk) and account.
 
 Accounts and sync: the app opens on a sign-in screen and has no sign-up. Games are kept on the device (`localStorage`) and uploaded to a Supabase table (`cloud.js`, plain `fetch`, no SDK), with an offline queue and idempotent ids. The publishable key in `cloud.js` is public by design: row-level security only lets an allow-listed account read or add its own rows, and sign-ups are disabled in the project settings.
 

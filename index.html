@@ -41,86 +41,123 @@
     </div>
   </main>
 
-  <!-- Home -->
-  <main id="home" class="screen" hidden aria-labelledby="home-title">
-    <header class="home-header">
-      <h1 id="home-title">Calcolo rapido</h1>
-      <p class="lead">Due minuti a partita: la risposta giusta passa da sola.</p>
-    </header>
+  <!-- Home: four tab panels -->
+  <main id="home" class="screen tabs-screen" hidden>
+    <section class="tab-panel" id="tab-gioca" role="tabpanel" aria-labelledby="home-title">
+      <header class="home-header">
+        <h1 id="home-title">Calcolo rapido</h1>
+        <p class="lead">Due minuti a partita: la risposta giusta passa da sola.</p>
+      </header>
 
-    <div class="group streak" id="streak" role="group">
-      <svg class="flame" viewBox="0 0 24 24" aria-hidden="true">
-        <path class="flame-outer" d="M13.2 1.8c.4 3.1 2.4 4.6 4 6.6 1.4 1.7 2.3 3.6 2.3 5.9a7.5 7.5 0 0 1-15 0c0-2.6 1.1-4.6 2.8-6.3.1 1.6.7 2.9 1.9 3.8C8.9 8 10.6 4.6 13.2 1.8Z"/>
-        <path class="flame-inner" d="M12.2 12.2c.4 1.5 1.5 2.3 2.2 3.4.4.6.6 1.2.6 1.9a3 3 0 0 1-6 0c0-1 .4-1.9 1.1-2.6.2.6.5 1 1 1.3-.1-1.4.3-2.8 1.1-4Z"/>
-      </svg>
-      <div class="streak-text" aria-hidden="true">
-        <p class="streak-main"><span class="streak-count" id="streak-count">0</span> <span id="streak-unit">giorni di fila</span></p>
-        <p class="streak-status" id="streak-status"></p>
-        <p class="streak-record" id="streak-record" hidden></p>
+      <div class="group streak" id="streak" role="group">
+        <svg class="flame" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="flame-outer" d="M13.2 1.8c.4 3.1 2.4 4.6 4 6.6 1.4 1.7 2.3 3.6 2.3 5.9a7.5 7.5 0 0 1-15 0c0-2.6 1.1-4.6 2.8-6.3.1 1.6.7 2.9 1.9 3.8C8.9 8 10.6 4.6 13.2 1.8Z"/>
+          <path class="flame-inner" d="M12.2 12.2c.4 1.5 1.5 2.3 2.2 3.4.4.6.6 1.2.6 1.9a3 3 0 0 1-6 0c0-1 .4-1.9 1.1-2.6.2.6.5 1 1 1.3-.1-1.4.3-2.8 1.1-4Z"/>
+        </svg>
+        <div class="streak-text" aria-hidden="true">
+          <p class="streak-main"><span class="streak-count" id="streak-count">0</span> <span id="streak-unit">giorni di fila</span></p>
+          <p class="streak-status" id="streak-status"></p>
+          <p class="streak-record" id="streak-record" hidden></p>
+        </div>
       </div>
-    </div>
 
-    <section class="group routine" aria-labelledby="routine-title">
-      <div class="routine-head">
-        <h2 id="routine-title">Scaletta di oggi</h2>
-        <p class="routine-count" id="routine-count"></p>
-      </div>
-      <ol class="steps" id="routine-steps"></ol>
-      <p class="routine-done" id="routine-done" hidden>Scaletta completata: i punteggi arrivano da soli nel diario. Puoi continuare con l'allenamento libero.</p>
-      <button type="button" class="button primary" id="routine-start">Inizia T12</button>
+      <section class="group routine" aria-labelledby="routine-title">
+        <div class="routine-head">
+          <h2 id="routine-title">Scaletta di oggi</h2>
+          <p class="routine-count" id="routine-count"></p>
+        </div>
+        <ol class="steps" id="routine-steps"></ol>
+        <p class="routine-done" id="routine-done" hidden>Scaletta completata: i punteggi arrivano da soli nel diario. Puoi continuare con l'allenamento libero.</p>
+        <button type="button" class="button primary" id="routine-start">Inizia T12</button>
+      </section>
+
+      <h2 class="section-title">Allenamento libero</h2>
+      <ul class="group" id="preset-list"></ul>
     </section>
 
-    <h2 class="section-title">Andamento</h2>
-    <section class="group chart-card" aria-labelledby="chart-title">
-      <div class="segmented" id="chart-presets" role="group" aria-label="Allenamento da mostrare">
-        <button type="button" data-preset="t12">T12</button>
-        <button type="button" data-preset="t100">T100</button>
-        <button type="button" data-preset="def">Default</button>
-      </div>
-      <h3 class="chart-title" id="chart-title"></h3>
-      <p class="chart-summary" id="chart-summary"></p>
-      <div class="chart-wrap">
-        <svg id="chart" class="chart" role="img" tabindex="0" width="100%"></svg>
-        <div class="chart-tooltip" id="chart-tooltip" role="status" aria-live="polite" hidden></div>
-      </div>
-      <p class="chart-empty" id="chart-empty" hidden>Ancora nessuna partita con questo allenamento.</p>
-      <p class="chart-legend" id="chart-legend" hidden>
-        <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot"/></svg> app</span>
-        <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot hollow"/></svg> Zetamac (dal diario)</span>
-      </p>
-      <details class="chart-data">
-        <summary>Mostra i valori</summary>
-        <table>
-          <thead><tr><th scope="col">Giorno</th><th scope="col">Migliore</th><th scope="col">Dove</th><th scope="col">Partite</th></tr></thead>
-          <tbody id="chart-table-body"></tbody>
-        </table>
-      </details>
+    <section class="tab-panel" id="tab-record" role="tabpanel" aria-labelledby="record-title" hidden>
+      <header class="home-header">
+        <h1 id="record-title">Record</h1>
+        <p class="lead">I tuoi migliori punteggi, dall'app e dal diario.</p>
+      </header>
+      <ul class="group records" id="record-list"></ul>
+
+      <h2 class="section-title">Andamento</h2>
+      <section class="group chart-card" aria-labelledby="chart-title">
+        <div class="segmented" id="chart-presets" role="group" aria-label="Allenamento da mostrare">
+          <button type="button" data-preset="t12">T12</button>
+          <button type="button" data-preset="t100">T100</button>
+          <button type="button" data-preset="def">Default</button>
+        </div>
+        <h3 class="chart-title" id="chart-title"></h3>
+        <p class="chart-summary" id="chart-summary"></p>
+        <div class="chart-wrap">
+          <svg id="chart" class="chart" role="img" tabindex="0" width="100%"></svg>
+          <div class="chart-tooltip" id="chart-tooltip" role="status" aria-live="polite" hidden></div>
+        </div>
+        <p class="chart-empty" id="chart-empty" hidden>Ancora nessuna partita con questo allenamento.</p>
+        <p class="chart-legend" id="chart-legend" hidden>
+          <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot"/></svg> app</span>
+          <span class="legend-key"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" class="dot hollow"/></svg> Zetamac (dal diario)</span>
+        </p>
+        <details class="chart-data">
+          <summary>Mostra i valori</summary>
+          <table>
+            <thead><tr><th scope="col">Giorno</th><th scope="col">Migliore</th><th scope="col">Dove</th><th scope="col">Partite</th></tr></thead>
+            <tbody id="chart-table-body"></tbody>
+          </table>
+        </details>
+      </section>
+
+      <h2 class="section-title">Ultime partite</h2>
+      <ul class="group history" id="history-list"></ul>
+      <button type="button" class="row-button more" id="history-more" hidden></button>
     </section>
 
-    <h2 class="section-title">Allenamento libero</h2>
-    <ul class="group" id="preset-list"></ul>
+    <section class="tab-panel" id="tab-obiettivi" role="tabpanel" aria-labelledby="goals-title" hidden>
+      <header class="home-header">
+        <h1 id="goals-title">Obiettivi</h1>
+        <p class="lead">Le tappe della roadmap verso la prova online di Optiver (febbraio 2027), con Zetamac in modalità Default.</p>
+      </header>
+      <section class="group goal-next" id="goal-next" aria-labelledby="goal-next-title"></section>
 
-    <h2 class="section-title">Ultime partite</h2>
-    <ul class="group history" id="history-list"></ul>
-    <button type="button" class="row-button more" id="history-more" hidden></button>
+      <h2 class="section-title">Default verso la prova online</h2>
+      <ul class="group goals" id="goal-list"></ul>
 
-    <h2 class="section-title">Promemoria</h2>
-    <div class="group today">
-      <p class="today-summary" id="push-line">Promemoria alle 10:00 e avviso streak alle 21:30, solo nei giorni in cui non hai ancora giocato.</p>
-      <p class="sync-status" id="push-status" role="status" aria-live="polite"></p>
-      <button type="button" class="button" id="push-enable" hidden>Attiva promemoria</button>
-      <button type="button" class="row-button" id="push-test" hidden>Invia una notifica di prova</button>
-      <button type="button" class="row-button" id="push-disable" hidden>Disattiva promemoria</button>
-    </div>
+      <h2 class="section-title">Streak</h2>
+      <ul class="group goals" id="streak-goals"></ul>
+    </section>
 
-    <h2 class="section-title">Account</h2>
-    <div class="group today">
-      <p class="today-summary" id="account-line"></p>
-      <p class="sync-status" id="sync-status" role="status" aria-live="polite"></p>
-      <button type="button" class="row-button" id="sync-now">Sincronizza ora</button>
-      <button type="button" class="row-button" id="sign-out">Esci</button>
-    </div>
+    <section class="tab-panel" id="tab-impostazioni" role="tabpanel" aria-labelledby="settings-title" hidden>
+      <header class="home-header">
+        <h1 id="settings-title">Impostazioni</h1>
+      </header>
+
+      <h2 class="section-title">Promemoria</h2>
+      <div class="group today">
+        <p class="today-summary" id="push-line">Promemoria alle 10:00 e avviso streak alle 21:30, solo nei giorni in cui non hai ancora giocato.</p>
+        <p class="sync-status" id="push-status" role="status" aria-live="polite"></p>
+        <button type="button" class="button" id="push-enable" hidden>Attiva promemoria</button>
+        <button type="button" class="row-button" id="push-test" hidden>Invia una notifica di prova</button>
+        <button type="button" class="row-button" id="push-disable" hidden>Disattiva promemoria</button>
+      </div>
+
+      <h2 class="section-title">Account</h2>
+      <div class="group today">
+        <p class="today-summary" id="account-line"></p>
+        <p class="sync-status" id="sync-status" role="status" aria-live="polite"></p>
+        <button type="button" class="row-button" id="sync-now">Sincronizza ora</button>
+        <button type="button" class="row-button" id="sign-out">Esci</button>
+      </div>
+    </section>
   </main>
+
+  <nav class="tabbar" id="tabbar" role="tablist" aria-label="Sezioni" hidden>
+    <button type="button" role="tab" class="tab" id="tabbtn-gioca" data-tab="gioca" aria-controls="tab-gioca" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path class="fill" d="M10 8.5v7l5.5-3.5z"/></svg><span>Gioca</span></button>
+    <button type="button" role="tab" class="tab" id="tabbtn-record" data-tab="record" aria-controls="tab-record" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M7.5 4h9v4.5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H5a2.5 2.5 0 0 0 2.6 3.6M16.5 6H19a2.5 2.5 0 0 1-2.6 3.6M12 13v4M8.5 20h7M9.5 17h5v3h-5z"/></svg><span>Record</span></button>
+    <button type="button" role="tab" class="tab" id="tabbtn-obiettivi" data-tab="obiettivi" aria-controls="tab-obiettivi" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle class="fill" cx="12" cy="12" r="1.6"/></svg><span>Obiettivi</span></button>
+    <button type="button" role="tab" class="tab" id="tabbtn-impostazioni" data-tab="impostazioni" aria-controls="tab-impostazioni" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle class="fill" cx="15" cy="7" r="2.2"/><circle class="fill" cx="9" cy="17" r="2.2"/></svg><span>Impostazioni</span></button>
+  </nav>
 
   <!-- Game -->
   <section id="game" class="screen game" hidden aria-label="Partita in corso">

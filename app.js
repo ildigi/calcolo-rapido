@@ -250,6 +250,7 @@ async function handleLogin(event) {
     $('login-password').value = '';
     renderHome();
     show('home');
+    selectTab(currentTab);
     syncNow();
   } catch (error) {
     if (error.status === undefined) errorEl.textContent = 'Nessuna connessione. Riprova quando sei online.';
@@ -547,6 +548,133 @@ function nearestPoint(event) {
   return best;
 }
 
+// ---------- Records ----------
+function recordFor(presetId, sessions) {
+  let best = null;
+  for (const s of sessions) {
+    if (s.preset === presetId && (!best || s.score > best.score)) best = s;
+  }
+  return best;
+}
+
+const longDate = (date) => new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+
+function renderRecords(sessions) {
+  const list = $('record-list');
+  list.replaceChildren();
+  for (const preset of PRESETS) {
+    const best = recordFor(preset.id, sessions);
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="preset-name"></span><span><span class="preset-title"></span><br><span class="record-when"></span></span><span class="record-value"></span>';
+    li.querySelector('.preset-name').textContent = preset.name;
+    li.querySelector('.preset-title').textContent = preset.title;
+    li.querySelector('.record-when').textContent = best
+      ? `${longDate(best.date)}${best.source === 'diario' ? ' · Zetamac' : ''}`
+      : 'Nessuna partita ancora';
+    li.querySelector('.record-value').textContent = best ? best.score : '–';
+    list.append(li);
+  }
+  const { best } = streakStats(sessions);
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="preset-name">Streak</span><span><span class="preset-title">Giorni di fila</span><br><span class="record-when">La serie più lunga</span></span><span class="record-value"></span>';
+  li.querySelector('.record-value').textContent = best;
+  list.append(li);
+}
+
+// ---------- Goals ----------
+// Milestones from "Roadmap Trader.md": Zetamac in Default mode before the Optiver online test.
+const SCORE_GOALS = [
+  { target: 25, by: '2026-11-30', label: 'Fine novembre' },
+  { target: 35, by: '2026-12-15', label: 'Metà dicembre' },
+  { target: 45, by: '2027-01-31', label: 'Fine gennaio' },
+  { target: 55, by: '2027-02-28', label: 'Prova online (febbraio)' },
+];
+const STREAK_GOALS = [3, 7, 14, 30, 60];
+
+const daysUntil = (isoDay) => dayNumber(`${isoDay}T12:00:00`) - dayNumber(Date.now());
+
+function firstReached(sessions, presetId, target) {
+  return sessions
+    .filter((s) => s.preset === presetId && s.score >= target)
+    .sort((a, b) => new Date(a.date) - new Date(b.date))[0] || null;
+}
+
+function meter(fraction) {
+  const track = document.createElement('div');
+  track.className = 'meter';
+  const fill = document.createElement('div');
+  fill.className = 'meter-fill';
+  fill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
+  track.append(fill);
+  return track;
+}
+
+function renderGoals(sessions) {
+  const best = recordFor('def', sessions);
+  const bestScore = best ? best.score : 0;
+
+  // The next goal not reached yet gets the big card.
+  const next = SCORE_GOALS.find((g) => bestScore < g.target);
+  const card = $('goal-next');
+  card.replaceChildren();
+  if (next) {
+    const left = daysUntil(next.by);
+    card.innerHTML = '<h2 id="goal-next-title"></h2><p class="goal-due"></p><div class="goal-numbers"><span class="goal-current"></span><span class="goal-target"></span></div>';
+    card.querySelector('h2').textContent = `Prossimo obiettivo: ${next.target} in Default`;
+    card.querySelector('.goal-due').textContent = left >= 0
+      ? `${next.label} · entro il ${longDate(`${next.by}T12:00:00`)} (${left === 0 ? 'oggi' : left === 1 ? 'domani' : `tra ${left} giorni`})`
+      : `${next.label} · scaduto il ${longDate(`${next.by}T12:00:00`)}`;
+    card.querySelector('.goal-current').textContent = bestScore;
+    card.querySelector('.goal-target').textContent = `obiettivo ${next.target}`;
+    card.append(meter(bestScore / next.target));
+    const p = document.createElement('p');
+    p.className = 'goal-left';
+    p.textContent = `Mancano ${next.target - bestScore} punti al tuo record attuale.`;
+    card.append(p);
+    card.setAttribute('aria-label', `Prossimo obiettivo: ${next.target} punti in Default. Record attuale ${bestScore}. ${card.querySelector('.goal-due').textContent}`);
+  } else {
+    card.innerHTML = '<h2 id="goal-next-title">Tutti gli obiettivi raggiunti</h2><p class="goal-due">Sei pronto per la prova online: mantieni il ritmo con la scaletta.</p>';
+  }
+
+  const list = $('goal-list');
+  list.replaceChildren();
+  for (const goal of SCORE_GOALS) {
+    const reached = firstReached(sessions, 'def', goal.target);
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="goal-name"></span><span class="goal-when"></span><span class="goal-state"></span>';
+    li.querySelector('.goal-name').textContent = `${goal.target} punti`;
+    li.querySelector('.goal-when').textContent = `${goal.label} · entro il ${new Date(`${goal.by}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}`;
+    const state = li.querySelector('.goal-state');
+    if (reached) {
+      state.classList.add('done');
+      state.textContent = `✓ Raggiunto il ${new Date(reached.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}`;
+    } else {
+      state.textContent = `${bestScore} / ${goal.target}`;
+      li.append(meter(bestScore / goal.target));
+    }
+    list.append(li);
+  }
+
+  const { current, best: bestStreak } = streakStats(sessions);
+  const streakList = $('streak-goals');
+  streakList.replaceChildren();
+  for (const days of STREAK_GOALS) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="goal-name"></span><span class="goal-when"></span><span class="goal-state"></span>';
+    li.querySelector('.goal-name').textContent = `${days} giorni di fila`;
+    li.querySelector('.goal-when').textContent = days <= 7 ? 'Il primo passo' : days <= 14 ? 'Diventa un\'abitudine' : 'Costanza da trader';
+    const state = li.querySelector('.goal-state');
+    if (bestStreak >= days) {
+      state.classList.add('done');
+      state.textContent = '✓ Raggiunto';
+    } else {
+      state.textContent = `${current} / ${days}`;
+      li.append(meter(current / days));
+    }
+    streakList.append(li);
+  }
+}
+
 // ---------- Home ----------
 const HISTORY_SHORT = 5;
 const HISTORY_LONG = 30;
@@ -556,7 +684,9 @@ function renderHome() {
   const sessions = loadSessions();
   renderStreak(sessions);
   renderRoutine(sessions);
-  renderChart(sessions);
+  renderRecords(sessions);
+  if (currentTab === 'record') renderChart(sessions);
+  renderGoals(sessions);
   renderPush();
 
   const list = $('preset-list');
@@ -643,8 +773,30 @@ function applyPendingUpdate() {
 
 function show(name) {
   for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
+  $('tabbar').hidden = name !== 'home';
   window.scrollTo(0, 0);
   applyPendingUpdate();
+}
+
+// ---------- Tabs ----------
+const TABS = ['gioca', 'record', 'obiettivi', 'impostazioni'];
+const TAB_KEY = 'calcolo.v1.tab';
+let currentTab = (() => { try { return TABS.includes(localStorage.getItem(TAB_KEY)) ? localStorage.getItem(TAB_KEY) : 'gioca'; } catch { return 'gioca'; } })();
+
+function selectTab(tab, { focus = false } = {}) {
+  currentTab = tab;
+  try { localStorage.setItem(TAB_KEY, tab); } catch { /* remembered for this session only */ }
+  for (const key of TABS) {
+    const button = $(`tabbtn-${key}`);
+    const selected = key === tab;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    $(`tab-${key}`).hidden = !selected;
+    if (selected && focus) button.focus();
+  }
+  window.scrollTo(0, 0);
+  // The chart measures its container, which has no width while its tab is hidden.
+  if (tab === 'record') renderChart(loadSessions());
 }
 
 function startGame(presetId) {
@@ -906,6 +1058,16 @@ $('pause-quit').addEventListener('click', quitGame);
 $('again').addEventListener('click', () => startGame(game.preset.id));
 $('next-step').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
 $('routine-start').addEventListener('click', (event) => startGame(event.currentTarget.dataset.preset));
+$('tabbar').addEventListener('click', (event) => {
+  const tab = event.target.closest('.tab');
+  if (tab) selectTab(tab.dataset.tab);
+});
+$('tabbar').addEventListener('keydown', (event) => {
+  const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+  if (!step) return;
+  event.preventDefault();
+  selectTab(TABS[(TABS.indexOf(currentTab) + step + TABS.length) % TABS.length], { focus: true });
+});
 $('push-enable').addEventListener('click', enablePush);
 $('push-test').addEventListener('click', testPush);
 $('push-disable').addEventListener('click', disablePush);
@@ -937,13 +1099,19 @@ $('history-more').addEventListener('click', () => {
   historyExpanded = !historyExpanded;
   renderHome();
 });
-$('to-home').addEventListener('click', () => { renderHome(); show('home'); });
+$('to-home').addEventListener('click', () => {
+  currentTab = 'gioca';
+  renderHome();
+  show('home');
+  selectTab('gioca');
+});
 
 // ---------- Start ----------
 migrateSessions();
 if (Cloud.signedIn) {
   renderHome();
   show('home');
+  selectTab(currentTab);
   syncNow();
 } else {
   showLogin('');
