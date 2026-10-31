@@ -237,8 +237,6 @@ function renderRoutine(sessions) {
     start.textContent = `Inizia ${presetById(next.preset).name}${next.repeats ? ` (${ORDINALS[next.nth]})` : ''}`;
     start.dataset.preset = next.preset;
   }
-  $('copy-today').hidden = !todaySummary(sessions);
-  $('copy-today-status').textContent = '';
 }
 
 // ---------- Home ----------
@@ -309,36 +307,6 @@ function renderHome() {
   }
 
   renderAccount();
-}
-
-// One line per day for the diary: best score per preset, in preset order.
-function todaySummary(sessions) {
-  const today = localDay(Date.now());
-  const parts = [];
-  for (const preset of PRESETS) {
-    const scores = sessions.filter((s) => s.preset === preset.id && localDay(s.date) === today).map((s) => s.score);
-    if (scores.length) parts.push(`${preset.name}: ${Math.max(...scores)}${scores.length > 1 ? ` (${scores.length} partite)` : ''}`);
-  }
-  return parts.length ? `${today} · ${parts.join(' · ')}` : '';
-}
-
-async function copyText(text, statusEl) {
-  let ok = false;
-  try {
-    await navigator.clipboard.writeText(text);
-    ok = true;
-  } catch {
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', '');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.append(area);
-    area.select();
-    try { ok = document.execCommand('copy'); } catch { ok = false; }
-    area.remove();
-  }
-  statusEl.textContent = ok ? 'Copiato. Incollalo nella chat o nel diario.' : `Copia non riuscita. Testo: ${text}`;
 }
 
 // ---------- Game ----------
@@ -547,7 +515,6 @@ function renderResults(session, prev, saved) {
     li.querySelector('.t').textContent = `${secondsIt(item.ms)} s`;
     list.append(li);
   }
-  $('copy-result-status').textContent = '';
 
   // One prominent action: the next routine step if there is one, otherwise play again.
   const { slots, next, done } = routineToday(loadSessions());
@@ -627,14 +594,6 @@ $('history-more').addEventListener('click', () => {
   renderHome();
 });
 $('to-home').addEventListener('click', () => { renderHome(); show('home'); });
-$('copy-result').addEventListener('click', () => {
-  const s = loadSessions().at(-1);
-  if (!s) return;
-  copyText(`${localDay(s.date)} · ${presetById(s.preset).name}: ${s.score}`, $('copy-result-status'));
-});
-$('copy-today').addEventListener('click', () => {
-  copyText(todaySummary(loadSessions()), $('copy-today-status'));
-});
 
 // ---------- Start ----------
 migrateSessions();
